@@ -1,0 +1,96 @@
+
+#ifdef __BLINK_GPIO__
+#include "custom_feature_def.h"
+#include "ql_trace.h"
+#include "ql_system.h"
+#include "ql_gpio.h"
+#include "ql_stdlib.h"
+#include "ql_error.h"
+#include "ql_uart.h"
+
+
+#define DEBUG_ENABLE 1
+#if DEBUG_ENABLE > 0
+#define DEBUG_PORT  UART_PORT1
+#define DBG_BUF_LEN   512
+static char DBG_BUFFER[DBG_BUF_LEN];
+#define APP_DEBUG(FORMAT,...) {\
+    Ql_memset(DBG_BUFFER, 0, DBG_BUF_LEN);\
+    Ql_sprintf(DBG_BUFFER,FORMAT,##__VA_ARGS__); \
+    if (UART_PORT2 == (DEBUG_PORT)) \
+    {\
+        Ql_Debug_Trace(DBG_BUFFER);\
+    } else {\
+        Ql_UART_Write((Enum_SerialPort)(DEBUG_PORT), (u8*)(DBG_BUFFER), Ql_strlen((const char *)(DBG_BUFFER)));\
+    }\
+}
+#else
+#define APP_DEBUG(FORMAT,...) 
+#endif
+
+
+static void CallBack_UART_Hdlr(Enum_SerialPort port, Enum_UARTEventType msg, bool level, void* customizedPara)
+{
+     
+}
+
+
+
+
+static void GPIO_Program(void)
+{
+    // Specify a GPIO pin
+    Enum_PinName  gpioPin = PINNAME_DTR;
+
+    // Define the initial level for GPIO pin
+    Enum_PinLevel gpioLvl = PINLEVEL_HIGH;
+
+    // Initialize the GPIO pin (output high level, pull up)
+    Ql_GPIO_Init(gpioPin, PINDIRECTION_OUT, gpioLvl, PINPULLSEL_PULLUP);
+	while(1){
+    Ql_Sleep(3000);
+    Ql_GPIO_SetLevel(gpioPin, PINLEVEL_LOW);
+    Ql_Sleep(3000);
+    Ql_GPIO_SetLevel(gpioPin, PINLEVEL_HIGH);}
+}
+
+/************************************************************************/
+/* The entrance for this example application                            */
+/************************************************************************/
+void proc_main_task(s32 taskId)
+{
+    s32 ret;
+    ST_MSG msg;
+
+    // Register & open UART port
+    ret = Ql_UART_Register(UART_PORT1, CallBack_UART_Hdlr, NULL);
+    if (ret < QL_RET_OK)
+    {
+        Ql_Debug_Trace("Fail to register serial port[%d], ret=%d\r\n", UART_PORT1, ret);
+    }
+    ret = Ql_UART_Open(UART_PORT1, 115200, FC_NONE);
+    if (ret < QL_RET_OK)
+    {
+        Ql_Debug_Trace("Fail to open serial port[%d], ret=%d\r\n", UART_PORT1, ret);
+    }
+    
+    APP_DEBUG("\r\n<-- OpenCPU: GPIO Example -->\r\n");
+
+    // Start to program GPIO pin
+    GPIO_Program();
+
+    // Start message loop of this task
+    while (TRUE)
+    {
+        Ql_OS_GetMessage(&msg);
+        switch(msg.message)
+        {
+        case MSG_ID_USER_START:
+            break;
+        default:
+            break;
+        }
+    }
+}
+
+#endif //__BLINK GPIO__
